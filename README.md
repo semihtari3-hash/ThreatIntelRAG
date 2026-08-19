@@ -1,10 +1,10 @@
-# 🛡️ ThreatIntelRAG - Siber Tehdit İstihbaratı ve Ağ Analizi RAG Sistemi
+#  ThreatIntelRAG - Siber Tehdit İstihbaratı ve Ağ Analizi RAG Sistemi
 
 **ThreatIntelRAG**, yerel siber tehdit istihbaratı raporlarını, ağ analiz dökümanlarını ve MITRE ATT&CK eşleştirmelerini semantik (anlamsal) olarak indeksleyen ve kullanıcı sorgularına nokta atışı analiz raporları üreten bir **Retrieval-Augmented Generation (RAG)** motorudur.
 
 ---
 
-## 🚀 Temel Özellikler
+##  Temel Özellikler
 
 * **Semantik Arama:** `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` çok dilli vektör modeli ile Türkçe tehdit istihbaratını anlamsal olarak analiz eder.
 * **Kalıcı Vektör Belleği:** ChromaDB persistent storage mimarisi ile dökümanları yüksek hızda vektörleştirip önbelleğe alır.
@@ -13,7 +13,7 @@
 
 ---
 
-## 🛠️ Proje Mimarisi
+##  Proje Mimarisi
 
 ```text
 ThreatIntelRAG/
