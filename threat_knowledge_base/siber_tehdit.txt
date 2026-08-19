@@ -1,0 +1,74 @@
+TÜRKİYE ULUSAL SİBER TEHDİT İSTİHBARATI, AĞ TRAFİK ANALİZİ VE TEHDİT AVCILIĞI REHBERİ
+
+BÖLÜM 1: AĞ TRAFİK ANALİZİ VE PAKET İNCELEME TEKNİKLERİ
+Ağ Trafik Analizi (NTA), bir kurumun ağ sınırları içerisindeki tüm veri akışının, protokol davranışlarının ve paket içeriklerinin güvenlik açıklarını, yetkisiz erişimleri ve anomali durumlarını tespit etmek amacıyla sürekli izlenmesidir.
+
+1.1 Derin Paket İnceleme (Deep Packet Inspection - DPI)
+- Mekanizma: DPI, OSI modelinin 2. ila 7. katmanları arasında gerçekleşir. Geleneksel paket filtrelemeden farkı, veri paketlerinin sadece başlık (header) alanlarına (IP, Port) değil, taşıdıkları uygulama katmanı yüküne (payload/content) bakmasıdır.
+- Kullanım Alanları: Kötü amaçlı yazılım (Malware) C2 trafiğinin tespiti, SQL Injection, XSS, Buffer Overflow ve veri sızdırma (Exfiltration) girişimlerinin tespiti.
+
+1.2 Paket Yakalama ve Akış Analizi (PCAP vs NetFlow/IPFIX)
+- PCAP (Packet Capture): Wireshark ve tcpdump araçları ile ham ağ arayüzünden yakalanan verilerdir. Ağın tam bir adli tıp (forensic) resmini sunar ancak depolama maliyeti yüksektir.
+- NetFlow / IPFIX: Paketlerin tam içeriği yerine akış (flow) özetlerini tutar. Bir akış; Kaynak IP, Hedef IP, Kaynak Port, Hedef Port, IP Protokolü, TOS ve TCP Bayrakları parametrelerinin aynı olduğu paketler kümesidir. High-bandwidth ağlarda ölçeklenebilir izleme sağlar.
+
+1.3 Wireshark İnceleme Filtreleri ve Analiz Kodları
+- ip.src == 192.168.1.100 && tcp.flags.syn == 1 && tcp.flags.ack == 0 -> SYN taraması veya SYN flood tespiti.
+- http.request.method == "POST" || http.request.uri contains "select" -> Web uygulaması saldırıları ve veri yükleme tespiti.
+- dns.flags.response == 0 && frame.len > 512 -> Şüpheli geniş DNS sorguları (DNS Tunneling tespiti).
+- tls.handshake.extensions_server_name -> Şifreli trafikte hedef domaini belirleyen SNI (Server Name Indication) alanı.
+
+BÖLÜM 2: SALDIRI TESPİT VE ÖNLEME SİSTEMLERİ (IDS/IPS)
+IDS/IPS sistemleri, ağ tabanlı (NIDS/NIPS) ve konak tabanlı (HIDS/HIPS) olarak ikiye ayrılır.
+
+2.1 Pasif IDS vs Aktif IPS
+- Pasif NIDS: Ağ trafiğini bir TAP (Test Access Point) veya SPAN (Port Mirroring) üzerinden kopyalayarak dinler. İhlal durumunda SIEM ve SOC ekranlarına alarm üretir; trafiği engellemez.
+- Aktif NIPS: Ağ trafiğinin geçiş hattında (inline) konumlanır. Zararlı tespit ettiği paketi anında düşürür (drop) veya TCP Reset (RST) göndererek oturumu kapatır.
+
+2.2 Tespit Yaklaşımları
+- İmza Tabanlı Tespit (Signature-Based): Bilinen saldırı kalıplarını ve zararlı yazılım bayt dizilimlerini veritabanındaki kurallarla (Snort/Suricata/YARA) eşleştirir. Sıfır gün (zero-day) saldırılarında etkisizdir.
+- Anomali Tabanlı Tespit (Anomaly-Based): Yapay zeka ve makine öğrenimi teknikleriyle normal ağ trafiğinin profilini çıkarır. Bu baseline davranıştan sapmaları tespit eder.
+
+2.3 Snort ve YARA Kural Anatomisi
+- Snort Kuralı Örneği: alert tcp $EXTERNAL_NET any -> $HOME_NET 22 (msg:"SSH Brute Force Attempt"; flow:to_server,established; detection_filter:track by_src, count 5, seconds 60; sid:1000001;)
+- YARA Kuralı Örneği: rule CobaltStrike_Beacon { strings: $s1 = "ReflectiveLoader" $hex1 = { 4D 5A 90 00 } condition: $s1 and $hex1 }
+
+BÖLÜM 3: SİBER SALDIRI TÜRLERİ VE MITRE ATT&CK EŞLEŞTİRMELERİ
+
+3.1 Dağıtık Hizmet Engelleme (DDoS) Saldırıları [MITRE T1498, T1499]
+- SYN Flood: TCP 3'lü el sıkışma (3-way handshake) sürecini istismar eder. Sunucuya sürekli SYN atılır, gelen SYN-ACK'ya ACK yanıtı verilmeyerek sunucunun bağlantı tablosu (backlog queue) doldurulur.
+- UDP Flood: Hedef sistemin rastgele portlarına yüksek hacimde UDP paketleri basılır. Sistem her paket için ICMP 'Destination Unreachable' yanıtı üretmeye çalışırken işlemci kilitlenir.
+- DNS Amplification: Saldırgan sahte kaynak IP adresi (IP Spoofing) kullanarak açık DNS sunucularına 'ANY' sorgusu atar. 1 baytlık isteğe karşılık 50 kat büyük yanıt hedefe akar.
+
+3.2 Keşif ve Port Tarama [MITRE T1046]
+- TCP SYN Scan (Stealth Scan): SYN gönderilir, SYN-ACK gelirse port açıktır. Saldırgan el sıkışmayı tamamlamamak için hemen RST fırlatır; log mekanizmaları bağlantı kurulmadığı için bunu kaydedemeyebilir.
+- Xmas Scan: TCP başlığındaki FIN, URG ve PSH bayrakları aynı anda 1 yapılarak gönderilir. RFC 793 standartlarına uymayan sistemleri tespit etmek için kullanılır.
+
+3.3 Kaba Kuvvet (Brute-Force) ve Credential Stuffing [MITRE T1110]
+- Otomatik sözlük saldırıları (Hydra, Medusa) kullanılarak SSH, RDP ve HTTP POST panelleri üzerinden parola tespiti yapılmaya çalışılır.
+
+BÖLÜM 4: ZARARLI YAZILIM TRAFİĞİ, C2 VE ŞİFRELİ TRAFİK ANALİZİ
+
+4.1 Komuta ve Kontrol (C2 / Command & Control) Kanalları [MITRE T1071]
+- Sızılan sistemdeki zararlı yazılımın dış dünyadaki saldırgan sunucusu ile kurduğu gizli haberleşme kanalıdır. Genellikle HTTP/HTTPS, DNS, Tor veya IRC protokollerini kullanır.
+
+4.2 DGA (Domain Generation Algorithm) ve DNS Tunneling [MITRE T1568.002, T1048.003]
+- DGA: Zararlı yazılımlar engellenen IP adreslerini aşmak için matematiksel bir algoritma (tarih/saat bazlı) kullanarak her gün binlerce rastgele alan adı (domain) üretir (Örn: a8f9x1z.com).
+- DNS Tunneling: Veri sızdırmak için hassas veri Base64 ile kodlanıp DNS sorgusunun sub-domain alanına gömülür (Örn: c2VjcmV0X2RhdGE=.attacker.com).
+
+4.3 Şifreli Trafik Analizi (JA3 / JA4 Fingerprinting) [MITRE T1573]
+- Şifreli (HTTPS/TLS) trafikte paketin içeriği açılamasa bile, istemcinin gönderdiği 'Client Hello' paketindeki TLS versiyonu, şifre süiti (Cipher Suites) ve uzantılardan bir JA3 karması (MD5 hash) üretilir. Bu karma, Cobalt Strike, TrickBot gibi zararlı yazılım ailelerini tespit eder.
+
+BÖLÜM 5: SİBER TEHDİT İSTİHBARATI (CTI), SIEM, SOAR VE ZERO TRUST
+
+5.1 Siber Tehdit İstihbaratı Seviyeleri
+1. Stratejik İstihbarat: Yönetim kademesi için tehdit aktörlerinin motivasyonlarını ve finansal etkilerini inceler.
+2. Taktiksel İstihbarat: Saldırganların kullandığı TTP'leri (Taktik, Teknik, Prosedürler - MITRE ATT&CK) inceler.
+3. Operasyonel İstihbarat: Yaklaşan veya devam eden saldırıların teknik detaylarını inceler.
+4. Teknik İstihbarat: Anlık IoC (Indicators of Compromise) verileridir; IP adresleri, domain isimleri ve dosya SHA256 hash değerleridir.
+
+5.2 STIX ve TAXII Standartları
+- STIX (Structured Threat Information eXpression): Tehdit istihbarat verilerini JSON formatında yapılandıran dil standardıdır.
+- TAXII (Trusted Automated eXchange of Intelligence Information): STIX verilerinin sistemler arasında güvenli ve otomatik aktarılmasını sağlayan protokol standardıdır.
+
+5.3 Zero Trust (Sıfır Güven) Mimarisi
+- "Asla Güvenme, Her Zaman Doğrula" ilkesine dayanır. Ağ sınırlarına (perimeter) güvenmek yerine, ağ içindeki her kullanıcıyı ve cihazı mikro-bölümleme (micro-segmentation) ve sürekli kimlik doğrulaması (MFA) ile denetler.
